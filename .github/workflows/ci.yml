@@ -1,0 +1,25 @@
+name: CMake contracts
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+      # Keep fixture workspaces outside this Git checkout so discovery tests
+      # cannot accidentally inherit the provider's repository root.
+      - name: Configure compiler-free contracts
+        run: cmake -S . -B "${{ runner.temp }}/vnm-cmake-build" -G Ninja
+      - name: Test acquisition and nested toolchain contracts
+        run: ctest --test-dir "${{ runner.temp }}/vnm-cmake-build" --output-on-failure
