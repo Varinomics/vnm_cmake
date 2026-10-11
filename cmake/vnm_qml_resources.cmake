@@ -49,7 +49,7 @@ function(vnm_add_qml_resources target)
         set(module_output_directory "${CMAKE_CURRENT_BINARY_DIR}/qml_modules/${target}")
         if(arg_GENERATE_QMLDIR)
             string(REPLACE "." "/" module_path "${arg_URI}")
-            set(module_output_directory "${CMAKE_CURRENT_BINARY_DIR}/${module_path}")
+            set(module_output_directory "${CMAKE_CURRENT_BINARY_DIR}/qml_modules/${module_path}")
         endif()
         qt_add_qml_module(${target}
             URI "${arg_URI}"
