@@ -36,6 +36,16 @@ Package-specific assertions, install components and dependency options belong
 to each consumer. These modules do not own a build scheduler or select a local
 compiler installation.
 
+`vnm_add_qml_resources(target URI uri RESOURCE_PREFIX prefix QRC_FILES manifests)`
+compiles the selected manifests' QML and JavaScript with Qt's QML module tools,
+preserving their resource URLs and embedding their other assets separately.
+Existing qmldir files and C++ type registration remain with the owner. Direct
+`QML_FILES` inputs use their `QT_RESOURCE_ALIAS` values. Release discards QML
+source contents; other configurations retain them. Qt fixes that choice at
+configure time, so use separate Release and non-Release trees. Static-library
+owners must install/export the `VNM_QML_RESOURCE_TARGETS` object targets with
+their backing library.
+
 Call `vnm_write_toolchain_context(path)` while configuring a producer. A nested
 `cmake -P` harness includes that generated file, then calls
 `vnm_append_toolchain_args(command)` to append the producer's explicit CMake
