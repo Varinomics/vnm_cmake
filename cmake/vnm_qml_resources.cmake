@@ -3,7 +3,8 @@ include_guard(GLOBAL)
 # Keep the selected QRC (including generated edition selections) as the URL
 # manifest. Qt owns compilation of QML; the remaining QRC owns ordinary assets.
 function(vnm_add_qml_resources target)
-    cmake_parse_arguments(PARSE_ARGV 1 arg "" "URI;RESOURCE_PREFIX" "QRC_FILES;QML_FILES")
+    cmake_parse_arguments(PARSE_ARGV 1 arg "GENERATE_QMLDIR" "URI;VERSION;RESOURCE_PREFIX"
+        "QRC_FILES;QML_FILES;RESOURCES")
     get_target_property(module_uri ${target} QT_QML_MODULE_URI)
     get_target_property(target_type ${target} TYPE)
     if(NOT module_uri)
@@ -13,7 +14,13 @@ function(vnm_add_qml_resources target)
         if(NOT DEFINED arg_RESOURCE_PREFIX)
             set(arg_RESOURCE_PREFIX "/")
         endif()
-        set(module_options NO_GENERATE_QMLDIR NO_GENERATE_QMLTYPES)
+        set(module_options "")
+        if(NOT arg_GENERATE_QMLDIR)
+            list(APPEND module_options NO_GENERATE_QMLDIR NO_GENERATE_QMLTYPES)
+        endif()
+        if(arg_VERSION)
+            list(APPEND module_options VERSION "${arg_VERSION}")
+        endif()
         if(target_type STREQUAL "EXECUTABLE")
             list(APPEND module_options NO_RESOURCE_TARGET_PATH)
             set(module_root "${arg_RESOURCE_PREFIX}")
@@ -39,10 +46,15 @@ function(vnm_add_qml_resources target)
             endif()
             list(APPEND module_options DISCARD_QML_CONTENTS)
         endif()
+        set(module_output_directory "${CMAKE_CURRENT_BINARY_DIR}/qml_modules/${target}")
+        if(arg_GENERATE_QMLDIR)
+            string(REPLACE "." "/" module_path "${arg_URI}")
+            set(module_output_directory "${CMAKE_CURRENT_BINARY_DIR}/${module_path}")
+        endif()
         qt_add_qml_module(${target}
             URI "${arg_URI}"
             RESOURCE_PREFIX "${arg_RESOURCE_PREFIX}"
-            OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/qml_modules/${target}"
+            OUTPUT_DIRECTORY "${module_output_directory}"
             OUTPUT_TARGETS resource_targets
             ${module_options})
         set_property(TARGET ${target} PROPERTY VNM_QML_RESOURCE_ROOT "${module_root}")
@@ -105,9 +117,10 @@ function(vnm_add_qml_resources target)
         set_property(TARGET ${target} PROPERTY AUTORCC ON)
         target_sources(${target} PRIVATE "${asset_qrc_path}")
     endforeach()
-    if(qml_files)
+    if(qml_files OR arg_RESOURCES)
         qt_target_qml_sources(${target}
             QML_FILES ${qml_files}
+            RESOURCES ${arg_RESOURCES}
             OUTPUT_TARGETS resource_targets)
         set_property(TARGET ${target} APPEND PROPERTY
             VNM_QML_RESOURCE_TARGETS ${resource_targets})

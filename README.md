@@ -40,9 +40,10 @@ compiler installation.
 compiles the selected manifests' QML and JavaScript with Qt's QML module tools,
 preserving their resource URLs and embedding their other assets separately.
 Existing qmldir files and C++ type registration remain with the owner. Direct
-`QML_FILES` inputs use their `QT_RESOURCE_ALIAS` values. Release discards QML
-source contents; other configurations retain them. Qt fixes that choice at
-configure time, so use separate Release and non-Release trees. Static-library
+`QML_FILES` and `RESOURCES` inputs use their `QT_RESOURCE_ALIAS` values;
+`GENERATE_QMLDIR` selects Qt's generated module metadata with optional `VERSION`.
+Release discards QML source contents; other configurations retain them. Qt fixes
+that choice at configure time, so use separate Release and non-Release trees. Static-library
 owners must install/export the `VNM_QML_RESOURCE_TARGETS` object targets with
 their backing library.
 
