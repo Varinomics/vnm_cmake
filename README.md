@@ -46,6 +46,11 @@ Release discards QML source contents; other configurations retain them. Qt fixes
 that choice at configure time, so use separate Release and non-Release trees. Static-library
 owners must install/export the `VNM_QML_RESOURCE_TARGETS` object targets with
 their backing library.
+The helper writes each transformed manifest under its own file name, which
+`Q_INIT_RESOURCE` users reference, in one directory per target. The manifests
+passed for one target must therefore have distinct file names, compared ignoring
+case because a set that differs only by case cannot be built on a
+case-insensitive filesystem; a repeated name is a configure error.
 
 Call `vnm_write_toolchain_context(path)` while configuring a producer. A nested
 `cmake -P` harness includes that generated file, then calls

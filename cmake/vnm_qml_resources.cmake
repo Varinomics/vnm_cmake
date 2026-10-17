@@ -94,6 +94,23 @@ function(vnm_add_qml_resources target)
         get_filename_component(qrc "${qrc}" ABSOLUTE)
         get_filename_component(qrc_directory "${qrc}" DIRECTORY)
         get_filename_component(qrc_name "${qrc}" NAME)
+        # The transformed manifest is written to qml_assets/<target>/<file name>
+        # and keeps that name, which Q_INIT_RESOURCE users reference, so a second
+        # manifest of the same name would silently replace the first. Names are
+        # compared ignoring case: on a case-insensitive filesystem a name that
+        # differs only by case is the same file, and such a set is not portable
+        # anyway. The helper may be called several times for one target, hence
+        # the record on the target.
+        string(TOLOWER "${qrc_name}" qrc_key)
+        get_property(recorded_qrc TARGET ${target} PROPERTY "VNM_QML_QRC_${qrc_key}")
+        if(recorded_qrc AND NOT recorded_qrc STREQUAL qrc)
+            message(FATAL_ERROR
+                "QRC_FILES of ${target} contain two manifests whose file names "
+                "are equal ignoring case: ${recorded_qrc} and ${qrc}. The helper "
+                "keeps each manifest under its file name in one directory per "
+                "target, so rename one of them.")
+        endif()
+        set_property(TARGET ${target} PROPERTY "VNM_QML_QRC_${qrc_key}" "${qrc}")
         set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${qrc}")
         file(STRINGS "${qrc}" lines)
         set(asset_qrc "")
