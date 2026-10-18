@@ -1,4 +1,6 @@
 include_guard(GLOBAL)
+set_property(GLOBAL PROPERTY VNM_QML_RESOURCE_ADAPTER
+    "${CMAKE_CURRENT_LIST_DIR}/vnm_qml_resources.py")
 
 # Keep the selected QRC (including generated edition selections) as the URL
 # manifest. Qt owns compilation of QML; the remaining QRC owns ordinary assets.
@@ -89,10 +91,14 @@ function(vnm_add_qml_resources target)
         set(qml_source_directory "${CMAKE_CURRENT_BINARY_DIR}/qml_sources/${target}")
     endif()
 
+    if(arg_QRC_FILES)
+        find_package(Python3 REQUIRED COMPONENTS Interpreter)
+        get_property(qrc_adapter GLOBAL PROPERTY VNM_QML_RESOURCE_ADAPTER)
+        set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${qrc_adapter}")
+    endif()
     set(qml_files ${arg_QML_FILES})
     foreach(qrc IN LISTS arg_QRC_FILES)
         get_filename_component(qrc "${qrc}" ABSOLUTE)
-        get_filename_component(qrc_directory "${qrc}" DIRECTORY)
         get_filename_component(qrc_name "${qrc}" NAME)
         # The transformed manifest is written to qml_assets/<target>/<file name>
         # and keeps that name, which Q_INIT_RESOURCE users reference, so a second
@@ -112,54 +118,38 @@ function(vnm_add_qml_resources target)
         endif()
         set_property(TARGET ${target} PROPERTY "VNM_QML_QRC_${qrc_key}" "${qrc}")
         set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${qrc}")
-        file(STRINGS "${qrc}" lines)
-        set(asset_qrc "")
-        foreach(line IN LISTS lines)
-            if(line MATCHES "<qresource[^>]*prefix=\"([^\"]*)\"")
-                set(prefix "${CMAKE_MATCH_1}")
-            endif()
-            if(line MATCHES "<file[^>]*>([^<]+)</file>")
-                set(source "${CMAKE_MATCH_1}")
-                set(alias "${source}")
-                get_filename_component(source "${source}" ABSOLUTE
-                    BASE_DIR "${qrc_directory}")
-                if(line MATCHES "alias=\"([^\"]+)\"")
-                    set(alias "${CMAKE_MATCH_1}")
-                else()
-                    string(REPLACE "<file" "<file alias=\"${alias}\"" line "${line}")
-                endif()
-                set(resource_url "${prefix}/${alias}")
-                string(REGEX REPLACE "/+" "/" resource_url "${resource_url}")
-                if(source MATCHES "\\.(qml|js|mjs)$")
-                    string(FIND "${resource_url}" "${module_root}/" root_position)
-                    if(NOT root_position EQUAL 0)
-                        message(FATAL_ERROR
-                            "${resource_url} is outside ${target}'s QML module root "
-                            "${module_root}/")
-                    endif()
-                    string(LENGTH "${module_root}/" root_length)
-                    string(SUBSTRING "${resource_url}" ${root_length} -1 qml_alias)
-                    # One source can appear at several QRC aliases. A per-URL
-                    # configured copy also keeps source properties target-local.
-                    set(qml_source
-                        "${qml_source_directory}/${qml_alias}")
-                    configure_file("${source}" "${qml_source}" COPYONLY)
-                    set_source_files_properties("${qml_source}" PROPERTIES
-                        QT_RESOURCE_ALIAS "${qml_alias}")
-                    list(APPEND qml_files "${qml_source}")
-                    continue()
-                endif()
-                if(no_generate_qmldir AND resource_url STREQUAL "${module_root}/qmldir")
-                    configure_file("${source}" "${module_output_directory}/qmldir" COPYONLY)
-                endif()
-                string(REGEX REPLACE ">[^<]+</file>" ">${source}</file>" line "${line}")
-            endif()
-            string(APPEND asset_qrc "${line}\n")
-        endforeach()
         set(asset_qrc_path "${CMAKE_CURRENT_BINARY_DIR}/qml_assets/${target}/${qrc_name}")
-        get_filename_component(asset_directory "${asset_qrc_path}" DIRECTORY)
-        file(MAKE_DIRECTORY "${asset_directory}")
-        file(WRITE "${asset_qrc_path}" "${asset_qrc}")
+        set(entries_path "${asset_qrc_path}.cmake")
+        execute_process(COMMAND "${Python3_EXECUTABLE}" "${qrc_adapter}"
+            "${qrc}" "${asset_qrc_path}" "${entries_path}"
+            RESULT_VARIABLE result ERROR_VARIABLE error)
+        if(NOT result EQUAL 0)
+            message(FATAL_ERROR "Cannot transform QRC ${qrc}:\n${error}")
+        endif()
+        include("${entries_path}")
+        foreach(entry IN LISTS vnm_qrc_entries)
+            set(source "${vnm_qrc_source_${entry}}")
+            set(resource_url "${vnm_qrc_url_${entry}}")
+            if(source MATCHES "\\.(qml|js|mjs)$")
+                string(FIND "${resource_url}" "${module_root}/" root_position)
+                if(NOT root_position EQUAL 0)
+                    message(FATAL_ERROR
+                        "${resource_url} is outside ${target}'s QML module root "
+                        "${module_root}/")
+                endif()
+                string(LENGTH "${module_root}/" root_length)
+                string(SUBSTRING "${resource_url}" ${root_length} -1 qml_alias)
+                # One source can appear at several QRC aliases. A per-URL
+                # configured copy also keeps source properties target-local.
+                set(qml_source "${qml_source_directory}/${qml_alias}")
+                configure_file("${source}" "${qml_source}" COPYONLY)
+                set_source_files_properties("${qml_source}" PROPERTIES
+                    QT_RESOURCE_ALIAS "${qml_alias}")
+                list(APPEND qml_files "${qml_source}")
+            elseif(no_generate_qmldir AND resource_url STREQUAL "${module_root}/qmldir")
+                configure_file("${source}" "${module_output_directory}/qmldir" COPYONLY)
+            endif()
+        endforeach()
         set_property(TARGET ${target} PROPERTY AUTORCC ON)
         target_sources(${target} PRIVATE "${asset_qrc_path}")
     endforeach()

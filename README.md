@@ -1,6 +1,6 @@
 # vnm_cmake
 
-CMake-only BSD utilities for acquiring owned source dependencies and configuring
+BSD build utilities for acquiring owned source dependencies and configuring
 nested consumers with their producer's toolchain. No language or Qt dependency
 is enabled by this package.
 
@@ -39,6 +39,8 @@ compiler installation.
 `vnm_add_qml_resources(target URI uri RESOURCE_PREFIX prefix QRC_FILES manifests)`
 compiles the selected manifests' QML and JavaScript with Qt's QML module tools,
 preserving their resource URLs and embedding their other assets separately.
+QRC conversion requires a host Python 3 interpreter at configure time; other
+helpers and direct `QML_FILES`/`RESOURCES` inputs do not require Python.
 Existing qmldir files and C++ type registration remain with the owner. Direct
 `QML_FILES` and `RESOURCES` inputs use their `QT_RESOURCE_ALIAS` values;
 `GENERATE_QMLDIR` selects Qt's generated module metadata with optional `VERSION`.
