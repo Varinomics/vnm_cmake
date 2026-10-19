@@ -4,6 +4,7 @@ project(vnm_cmake VERSION 0.1.0 LANGUAGES NONE)
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/vnm_owned_dependency.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/vnm_nested_toolchain.cmake")
 include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/vnm_qml_resources.cmake")
+include("${CMAKE_CURRENT_SOURCE_DIR}/cmake/vnm_runtime_dlls.cmake")
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     install(DIRECTORY cmake/ DESTINATION share/vnm_cmake)

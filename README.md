@@ -36,6 +36,17 @@ Package-specific assertions, install components and dependency options belong
 to each consumer. These modules do not own a build scheduler or select a local
 compiler installation.
 
+`vnm_stage_runtime_dlls(TARGETS targets DESTINATION directory)` stages Windows
+runtime imports in the caller-selected executable directory, including imports
+of worker DLLs loaded from another directory. `EXTRA_FILES` adds runtime files;
+`AGGREGATE_TARGET` attaches the generated `<target>_runtime_dlls` targets to a
+consumer's sidecar aggregate. These targets refresh on every aggregate build,
+even when the application does not relink. Use `POST_BUILD` for the application
+itself when it already depends on that aggregate. Other platforms do no staging.
+The Windows integration fixture in `tests/runtime_dlls` is a separate CMake
+project: build `host`, then run its CTest entries. Reconfigure with a changed
+`RUNTIME_VALUE`, build `host` again and rerun CTest to check runtime refresh.
+
 `vnm_add_qml_resources(target URI uri RESOURCE_PREFIX prefix QRC_FILES manifests)`
 compiles the selected manifests' QML and JavaScript with Qt's QML module tools,
 preserving their resource URLs and embedding their other assets separately.

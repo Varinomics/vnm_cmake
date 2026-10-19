@@ -1,0 +1,1 @@
+__declspec(dllexport) int runtime_value(void) { return @RUNTIME_VALUE@; }
