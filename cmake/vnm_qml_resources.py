@@ -19,6 +19,15 @@ def local_name(element):
     return element.tag.rsplit("}", 1)[-1]
 
 
+def write_if_different(path, content):
+    try:
+        if path.read_bytes() == content:
+            return
+    except FileNotFoundError:
+        pass
+    path.write_bytes(content)
+
+
 def transform(qrc, assets, entries):
     tree = xml.parse(qrc)
     handoffs = []
@@ -51,13 +60,13 @@ def transform(qrc, assets, entries):
                 node.text = source
 
     assets.parent.mkdir(parents=True, exist_ok=True)
-    tree.write(assets, encoding="utf-8", xml_declaration=True)
+    write_if_different(assets, xml.tostring(tree.getroot(), encoding="utf-8", xml_declaration=True))
     statements = ["set(vnm_qrc_entries " + cmake_value(
         ";".join(str(index) for index in range(len(handoffs)))) + ")\n"]
     for index, (source, resource_url) in enumerate(handoffs):
         statements.append("set(vnm_qrc_source_" + str(index) + " " + cmake_value(source) + ")\n")
         statements.append("set(vnm_qrc_url_" + str(index) + " " + cmake_value(resource_url) + ")\n")
-    entries.write_text("".join(statements), encoding="utf-8")
+    write_if_different(entries, "".join(statements).encode("utf-8"))
 
 
 def main():
