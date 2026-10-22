@@ -136,7 +136,7 @@ def check_case(args, name, inputs):
     if name == "across_manifests":
         if (build / "qml_modules/probe/qmldir").read_bytes() != (source_dir / "qmldir").read_bytes():
             raise AssertionError("Root qmldir was not copied to Qt tooling directory")
-    if (build / "qml_modules/other/qmldir").read_bytes() != b"module Other\n":
+    if (build / "qml_modules/other/qmldir").read_text(encoding="utf-8") != "module Other\n":
         raise AssertionError("Default qmldir was not kept target-local")
 
     # A reconfigure must not invalidate Qt cache generation or rcc when the
@@ -193,7 +193,7 @@ def check_case(args, name, inputs):
         configured = run(configure_command, case / "qmldir_remove.log")
         if configured.returncode:
             raise AssertionError(configured.stdout + configured.stderr)
-        if qmldir.read_bytes() != b"module Contract\n":
+        if qmldir.read_text(encoding="utf-8") != "module Contract\n":
             raise AssertionError("Removing supplied qmldir did not restore the default")
         if any(item["url"] == ":/qmldir" for item in xml_entries(build / "qml_assets/probe/second.qrc")):
             raise AssertionError("Removing supplied qmldir did not update the residual QRC")
