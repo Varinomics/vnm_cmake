@@ -27,11 +27,28 @@ function(target_sources target visibility)
     endforeach()
 endfunction()
 
+# Model the ordering capability of Qt versions which defer target finalization.
+# No Qt target finalizers run in this compiler-free fixture.
+function(_qt_internal_delay_finalization_until_after defer_id)
+endfunction()
+if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.19)
+    set(deferred_qmldir TRUE)
+else()
+    set(deferred_qmldir FALSE)
+endif()
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/deferred_qmldir.txt" "${deferred_qmldir}")
+
 include("${PROVIDER_SOURCE}/cmake/vnm_qml_resources.cmake")
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/qml_handoff.tsv" "")
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/asset_handoff.txt" "")
 add_executable(probe IMPORTED)
-vnm_add_qml_resources(probe URI Contract QRC_FILES ${INPUT_QRCS})
+foreach(qrc IN LISTS INPUT_QRCS)
+    vnm_add_qml_resources(probe URI Contract QRC_FILES "${qrc}")
+endforeach()
+# A second module without a supplied qmldir catches deferred arguments or
+# selected metadata leaking between targets.
+add_executable(other IMPORTED)
+vnm_add_qml_resources(other URI Other)
 if(CMAKE_C_COMPILER OR CMAKE_CXX_COMPILER OR TARGET Qt6::Core)
     message(FATAL_ERROR "The transformation fixture must not enable compilers or Qt libraries")
 endif()

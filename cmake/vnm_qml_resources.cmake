@@ -2,6 +2,26 @@ include_guard(GLOBAL)
 set_property(GLOBAL PROPERTY VNM_QML_RESOURCE_ADAPTER
     "${CMAKE_CURRENT_LIST_DIR}/vnm_qml_resources.py")
 
+function(_vnm_write_qml_tooling_qmldir target)
+    get_target_property(output_directory ${target} QT_QML_MODULE_OUTPUT_DIRECTORY)
+    get_property(source TARGET ${target} PROPERTY VNM_QML_TOOLING_QMLDIR_SOURCE)
+    if(source)
+        configure_file("${source}" "${output_directory}/qmldir" COPYONLY)
+        return()
+    endif()
+
+    get_target_property(uri ${target} QT_QML_MODULE_URI)
+    set(content "module ${uri}\n")
+    if(EXISTS "${output_directory}/qmldir")
+        file(READ "${output_directory}/qmldir" previous_content)
+        if(previous_content STREQUAL content)
+            return()
+        endif()
+    endif()
+    file(MAKE_DIRECTORY "${output_directory}")
+    file(WRITE "${output_directory}/qmldir" "${content}")
+endfunction()
+
 # Keep the selected QRC (including generated edition selections) as the URL
 # manifest. Qt owns compilation of QML; the remaining QRC owns ordinary assets.
 # Set VNM_QML_SHORT_SOURCE_PATHS on the target before its first call when Qt's
@@ -57,12 +77,6 @@ function(vnm_add_qml_resources target)
             string(REPLACE "." "/" module_path "${arg_URI}")
             set(module_output_directory "${CMAKE_CURRENT_BINARY_DIR}/qml_modules/${module_path}")
         endif()
-        if(NOT arg_GENERATE_QMLDIR)
-            # Qt's cache compiler also requires a tooling qmldir when its
-            # generation is disabled. The selected QRC can supply its contents.
-            file(MAKE_DIRECTORY "${module_output_directory}")
-            file(WRITE "${module_output_directory}/qmldir" "module ${arg_URI}\n")
-        endif()
         qt_add_qml_module(${target}
             URI "${arg_URI}"
             RESOURCE_PREFIX "${arg_RESOURCE_PREFIX}"
@@ -74,7 +88,6 @@ function(vnm_add_qml_resources target)
             VNM_QML_RESOURCE_TARGETS ${resource_targets})
     endif()
     get_target_property(module_root ${target} VNM_QML_RESOURCE_ROOT)
-    get_target_property(module_output_directory ${target} QT_QML_MODULE_OUTPUT_DIRECTORY)
     get_target_property(no_generate_qmldir ${target} QT_QML_MODULE_NO_GENERATE_QMLDIR)
 
     get_target_property(short_source_paths ${target} VNM_QML_SHORT_SOURCE_PATHS)
@@ -147,7 +160,7 @@ function(vnm_add_qml_resources target)
                     QT_RESOURCE_ALIAS "${qml_alias}")
                 list(APPEND qml_files "${qml_source}")
             elseif(no_generate_qmldir AND resource_url STREQUAL "${module_root}/qmldir")
-                configure_file("${source}" "${module_output_directory}/qmldir" COPYONLY)
+                set_property(TARGET ${target} PROPERTY VNM_QML_TOOLING_QMLDIR_SOURCE "${source}")
             endif()
         endforeach()
         set_property(TARGET ${target} PROPERTY AUTORCC ON)
@@ -160,5 +173,26 @@ function(vnm_add_qml_resources target)
             OUTPUT_TARGETS resource_targets)
         set_property(TARGET ${target} APPEND PROPERTY
             VNM_QML_RESOURCE_TARGETS ${resource_targets})
+    endif()
+    if(no_generate_qmldir)
+        # Select the final contents across all calls before writing. Replacing
+        # a supplied qmldir with the fallback and back on every configure would
+        # invalidate every QML cache, even if both writes preserve equal files.
+        # Qt needs the file before its configure-time import finalizers, so
+        # generation-time file(GENERATE) is too late.
+        if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.19
+                AND COMMAND _qt_internal_delay_finalization_until_after)
+            get_property(deferred TARGET ${target} PROPERTY VNM_QML_TOOLING_QMLDIR_DEFERRED)
+            if(NOT deferred)
+                cmake_language(EVAL CODE
+                    "cmake_language(DEFER ID_VAR write_id CALL _vnm_write_qml_tooling_qmldir ${target})")
+                _qt_internal_delay_finalization_until_after(${write_id})
+                set_property(TARGET ${target} PROPERTY VNM_QML_TOOLING_QMLDIR_DEFERRED TRUE)
+            endif()
+        else()
+            # Older CMake/Qt cannot order a deferred write before finalization.
+            # Keep their immediate behavior, with content-preserving writes.
+            _vnm_write_qml_tooling_qmldir(${target})
+        endif()
     endif()
 endfunction()
