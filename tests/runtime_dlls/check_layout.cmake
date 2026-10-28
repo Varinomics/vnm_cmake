@@ -2,6 +2,7 @@ get_filename_component(worker_dir "${WORKER_FILE}" DIRECTORY)
 get_filename_component(runtime_name "${RUNTIME_FILE}" NAME)
 foreach(path IN ITEMS
         "${WORKER_FILE}"
+        "${SECOND_WORKER_FILE}"
         "${worker_dir}/vnm_package.json"
         "${worker_dir}/resource.txt"
         "${RUNTIME_DIR}/${runtime_name}"
@@ -17,6 +18,6 @@ if(NOT source_hash STREQUAL staged_hash)
 endif()
 file(GLOB packaged_dlls "${RUNTIME_DIR}/*.dll" "${worker_dir}/*.dll")
 list(LENGTH packaged_dlls dll_count)
-if(NOT dll_count EQUAL 2)
-    message(FATAL_ERROR "Expected one worker and one shared native runtime: ${packaged_dlls}")
+if(NOT dll_count EQUAL 3)
+    message(FATAL_ERROR "Expected two workers and one shared native runtime: ${packaged_dlls}")
 endif()

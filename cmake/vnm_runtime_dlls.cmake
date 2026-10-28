@@ -1,9 +1,11 @@
 include_guard(GLOBAL)
+set_property(GLOBAL PROPERTY VNM_RUNTIME_DLLS_STAGE_HELPER
+    "${CMAKE_CURRENT_LIST_DIR}/vnm_runtime_dlls_stage.cmake")
 
 # Stage native imports beside the executable that loads them. A worker DLL's
 # own directory is not necessarily a Windows loader search directory.
 # POST_BUILD is for an application that already depends on AGGREGATE_TARGET;
-# sidecars use always-run staging targets so their changes need no app relink.
+# aggregate staging compares each shared import once without an app relink.
 function(vnm_stage_runtime_dlls)
     cmake_parse_arguments(PARSE_ARGV 0 arg "POST_BUILD" "DESTINATION;AGGREGATE_TARGET"
         "TARGETS;EXTRA_FILES")
@@ -30,18 +32,10 @@ function(vnm_stage_runtime_dlls)
         endif()
         set(script "${CMAKE_CURRENT_BINARY_DIR}/runtime_dlls/${target}-$<CONFIG>.cmake")
         file(GENERATE OUTPUT "${script}" CONTENT
-"set(files [==[$<TARGET_RUNTIME_DLLS:${target}>;${arg_EXTRA_FILES}]==])
-set(destination [==[${arg_DESTINATION}]==])
-list(FILTER files EXCLUDE REGEX \"^$\")
-list(REMOVE_DUPLICATES files)
-if(files)
-    file(MAKE_DIRECTORY \"\${destination}\")
-    foreach(runtime_file IN LISTS files)
-        get_filename_component(name \"\${runtime_file}\" NAME)
-        file(COPY_FILE \"\${runtime_file}\" \"\${destination}/\${name}\"
-            ONLY_IF_DIFFERENT)
-    endforeach()
-endif()
+"set(VNM_RUNTIME_DLLS_LOCK_ROOT [==[${CMAKE_BINARY_DIR}/runtime_dlls/locks]==])
+include([==[${CMAKE_CURRENT_FUNCTION_LIST_DIR}/vnm_runtime_dlls_stage.cmake]==])
+vnm_stage_runtime_files([==[${arg_DESTINATION}]==]
+    [==[$<TARGET_RUNTIME_DLLS:${target}>;${arg_EXTRA_FILES}]==])
 ")
         if(arg_POST_BUILD)
             add_custom_command(TARGET "${target}" POST_BUILD
@@ -49,19 +43,30 @@ endif()
                 VERBATIM)
         else()
             set(stage_target "${target}_runtime_dlls")
-            set(dependencies "${target}")
-            # Serialize writers: several sidecars can import the same DLL.
-            get_property(previous_stage GLOBAL PROPERTY VNM_RUNTIME_DLL_STAGE_LAST)
-            if(previous_stage)
-                list(APPEND dependencies "${previous_stage}")
-            endif()
             add_custom_target("${stage_target}"
                 COMMAND "${CMAKE_COMMAND}" -P "${script}"
-                DEPENDS ${dependencies}
+                DEPENDS "${target}"
                 VERBATIM)
-            set_property(GLOBAL PROPERTY VNM_RUNTIME_DLL_STAGE_LAST "${stage_target}")
             if(arg_AGGREGATE_TARGET)
-                add_dependencies("${arg_AGGREGATE_TARGET}" "${stage_target}")
+                set(group_target "${arg_AGGREGATE_TARGET}_runtime_dlls")
+                if(NOT TARGET "${group_target}")
+                    set(group_script
+                        "${CMAKE_CURRENT_BINARY_DIR}/runtime_dlls/${arg_AGGREGATE_TARGET}.cmake")
+                    file(WRITE "${group_script}" "")
+                    add_custom_target("${group_target}"
+                        COMMAND "${CMAKE_COMMAND}"
+                            "-DVNM_RUNTIME_DLLS_CONFIGURATION=$<CONFIG>"
+                            -P "${group_script}"
+                        VERBATIM)
+                    set_property(TARGET "${group_target}"
+                        PROPERTY VNM_RUNTIME_DLLS_SCRIPT "${group_script}")
+                    add_dependencies("${arg_AGGREGATE_TARGET}" "${group_target}")
+                endif()
+                get_target_property(group_script "${group_target}" VNM_RUNTIME_DLLS_SCRIPT)
+                string(REPLACE "$<CONFIG>" "\${VNM_RUNTIME_DLLS_CONFIGURATION}"
+                    include_script "${script}")
+                file(APPEND "${group_script}" "include(\"${include_script}\")\n")
+                add_dependencies("${group_target}" "${target}")
             endif()
         endif()
     endforeach()

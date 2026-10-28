@@ -23,6 +23,12 @@ add_test(NAME nested_toolchain
         "-DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/nested_toolchain"
         -P "${CMAKE_CURRENT_SOURCE_DIR}/nested_toolchain.cmake")
 
+add_test(NAME runtime_dll_staging
+    COMMAND "${CMAKE_COMMAND}"
+        "-DTEST_ROOT=${CMAKE_CURRENT_BINARY_DIR}/runtime_dll_staging"
+        "-DPROVIDER_SOURCE=${PROJECT_SOURCE_DIR}"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/runtime_dll_staging.cmake")
+
 foreach(case IN ITEMS collision collision_calls collision_case repeat targets)
     add_test(NAME qml_resources_${case}
         COMMAND "${CMAKE_COMMAND}"
