@@ -1,6 +1,4 @@
 include_guard(GLOBAL)
-set_property(GLOBAL PROPERTY VNM_RUNTIME_DLLS_STAGE_HELPER
-    "${CMAKE_CURRENT_LIST_DIR}/vnm_runtime_dlls_stage.cmake")
 
 # Stage native imports beside the executable that loads them. A worker DLL's
 # own directory is not necessarily a Windows loader search directory.

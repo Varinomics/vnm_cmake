@@ -1,18 +1,8 @@
 include_guard(GLOBAL)
 
 function(vnm_stage_runtime_files destination files)
-    cmake_parse_arguments(PARSE_ARGV 2 arg "" "LOCK_GUARD" "")
-    if(arg_UNPARSED_ARGUMENTS OR arg_KEYWORDS_MISSING_VALUES)
-        message(FATAL_ERROR "vnm_stage_runtime_files accepts only an optional LOCK_GUARD.")
-    endif()
-    if(NOT DEFINED arg_LOCK_GUARD)
-        set(arg_LOCK_GUARD FUNCTION)
-    endif()
-    if(NOT arg_LOCK_GUARD MATCHES "^(FUNCTION|PROCESS)$")
-        message(FATAL_ERROR "Runtime staging LOCK_GUARD must be FUNCTION or PROCESS.")
-    endif()
     list(FILTER files EXCLUDE REGEX "^$")
-    if(NOT files AND arg_LOCK_GUARD STREQUAL "FUNCTION")
+    if(NOT files)
         return()
     endif()
     file(MAKE_DIRECTORY "${destination}")
@@ -22,10 +12,10 @@ function(vnm_stage_runtime_files destination files)
     endif()
     string(SHA256 lock_key "${destination_identity}")
     file(MAKE_DIRECTORY "${VNM_RUNTIME_DLLS_LOCK_ROOT}")
-    # Qt deployment and individually requested stages may share this directory.
+    # Aggregate and individually requested stages may share this directory.
     # Lock by actual destination so independent runtime layouts remain parallel.
     file(LOCK "${VNM_RUNTIME_DLLS_LOCK_ROOT}/${lock_key}.lock"
-        GUARD ${arg_LOCK_GUARD} TIMEOUT 600 RESULT_VARIABLE lock_result)
+        GUARD FUNCTION TIMEOUT 600 RESULT_VARIABLE lock_result)
     if(NOT lock_result STREQUAL "0")
         message(FATAL_ERROR "Could not stage runtime files in ${destination}: ${lock_result}")
     endif()
